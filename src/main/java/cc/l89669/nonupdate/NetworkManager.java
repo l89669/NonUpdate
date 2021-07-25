@@ -13,7 +13,9 @@ public class NetworkManager extends SecurityManager {
     public void checkPermission(final Permission perm) {
         if (perm instanceof SocketPermission) {
             SocketPermission socketperm = (SocketPermission) perm;
-            NonUpdate.LOGGER.info("[NonUpdate] Attemption: " + socketperm.getActions() + " " + socketperm.getName());
+            LoggingLevel logLevel = NonUpdate.configuration.loggingLevel();
+            if (logLevel.contains(LoggingLevel.VERBOSE))
+                NonUpdate.LOGGER.info("[NonUpdate] Attemption: " + socketperm.getActions() + " " + socketperm.getName());
             if (socketperm.getName().indexOf(':') == -1 && socketperm.getName().indexOf('.') == -1)
                 return; // sockets, for some special uses
             if (socketperm.getName().startsWith("localhost:") || socketperm.getName().startsWith("127.0.0.1:"))
@@ -21,11 +23,16 @@ public class NetworkManager extends SecurityManager {
             if (socketperm.getActions().contains("listen") || socketperm.getActions().contains("accept"))
                 return; // server is trying to communicate with players! never block them!
             if (socketperm.getActions().contains("connect") || socketperm.getActions().contains("resolve")) {
-                boolean defaultBlocking = NonUpdate.configuration.defaultBlocking();
-                boolean blocking = NonUpdate.configuration.checkURL(socketperm.getName().toLowerCase());
-                if (defaultBlocking)
-                    blocking = !blocking;
-                NonUpdate.LOGGER.info("[NonUpdate] Status: blocking={}, defaultBlocking={}", blocking, defaultBlocking);
+                boolean blocking = NonUpdate.configuration.checkBlockURL(socketperm.getName().toLowerCase());
+
+                if (logLevel.contains(LoggingLevel.VERBOSE)) {
+                    NonUpdate.LOGGER.info("[NonUpdate] Status: blocking={}, defaultBlocking={}", blocking, NonUpdate.configuration.defaultBlocking());
+                } else if (blocking && logLevel.contains(LoggingLevel.DETAILED)) {
+                    NonUpdate.LOGGER.info("[NonUpdate] Attemption: " + socketperm.getActions() + " " + socketperm.getName());
+                    NonUpdate.LOGGER.info("[NonUpdate] Status: blocking={}, defaultBlocking={}", blocking, NonUpdate.configuration.defaultBlocking());
+                } else if (blocking && logLevel.contains(LoggingLevel.BLOCKED)) {
+                    NonUpdate.LOGGER.info("[NonUpdate] Blocked: {}", socketperm.getName());
+                }
                 if (blocking)
                     throw new MalformedURLException("Socket connection blocked");
             }
